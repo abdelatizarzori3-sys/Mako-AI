@@ -97,23 +97,73 @@ pnpm test
 pnpm build
 ```
 
-## Architecture
+## Project structure
+
+After applying the release patch, the repository is organized as a full-stack TypeScript application. The frontend and backend live in separate top-level directories while sharing types and runtime contracts.
 
 ```text
-client/                 React 19 interface and design system
-server/routers.ts       tRPC router, including the AI chat mutation
-server/_core/llm.ts     Server-side model gateway helper
-drizzle/                Database schema and migrations
-shared/                 Shared types and constants
+Mako-AI/
+├── client/                         # React 19 browser application
+│   ├── index.html                  # HTML document, metadata, and font loading
+│   ├── public/                     # Small public configuration assets only
+│   └── src/
+│       ├── pages/Home.tsx          # Marokecho conversation workspace and UI state
+│       ├── components/             # Reusable UI, chat, and layout components
+│       ├── components/ui/          # Prebuilt accessible interface primitives
+│       ├── contexts/               # Theme and client-wide React contexts
+│       ├── hooks/                  # Reusable client interaction hooks
+│       ├── lib/trpc.ts             # Typed tRPC client binding
+│       ├── main.tsx                # React, Query Client, and tRPC providers
+│       └── index.css               # Signal & Sand design tokens and responsive styling
+├── server/                         # Express and tRPC server application
+│   ├── routers.ts                  # Public API router and ai.chat mutation
+│   ├── routers.chat.test.ts        # Chat validation and response contract tests
+│   ├── db.ts                       # Database connection and user persistence helpers
+│   ├── storage.ts                  # Server-side storage helpers
+│   └── _core/                      # Framework integration and protected server utilities
+│       ├── index.ts                # Server bootstrap and Vite integration
+│       ├── trpc.ts                 # tRPC procedures and context helpers
+│       ├── llm.ts                  # Server-only language-model gateway helper
+│       ├── env.ts                  # Typed access to server environment variables
+│       ├── oauth.ts                # OAuth callback and authentication integration
+│       └── storageProxy.ts          # Authenticated storage proxy
+├── drizzle/                        # Drizzle schema, relations, and database migrations
+├── shared/                         # Shared types, error helpers, and constants
+├── patches/                        # Dependency patches required by pnpm
+├── package.json                    # Scripts, runtime dependencies, and toolchain versions
+├── vite.config.ts                  # Vite client build configuration
+├── vitest.config.ts                # Vitest test-runner configuration
+└── README.md                       # Installation, operations, and contribution guide
 ```
 
-The chat workflow is intentionally server mediated:
+### Responsibility guide
+
+| Location | Responsibility | When to change it |
+|---|---|---|
+| `client/src/pages/Home.tsx` | Product-facing chat experience, prompts, notices, and local message state | Changing the main conversation workflow or visible copy |
+| `client/src/components/` | Reusable presentation and interaction elements | Adding or refining an interface component used in more than one place |
+| `client/src/lib/trpc.ts` | Typed frontend access to the server API | Rarely; only if the tRPC client setup itself changes |
+| `server/routers.ts` | API contracts, input validation, model invocation, and response shapes | Adding a server capability or changing the chat contract |
+| `server/_core/llm.ts` | Credentialed model gateway invoked on the server | Extending supported model-call behavior; never expose it to the browser |
+| `server/db.ts` and `drizzle/` | Persistent data access and schema evolution | Adding durable user, session, or workspace data |
+| `shared/` | Types and constants used by both client and server | Sharing a stable contract across the application boundary |
+| `.env` and deployment secrets | Runtime credentials and environment-specific configuration | Configuring an environment; never commit these files |
+
+### Request flow
+
+The chat path is intentionally server mediated. The browser never calls the model gateway directly and never receives the gateway key.
 
 ```text
-Browser → tRPC /api/trpc/ai.chat → server validation → language model gateway → response
+Home.tsx
+  → trpc.ai.chat.useMutation()
+  → POST /api/trpc/ai.chat
+  → server/routers.ts validates message and bounded history
+  → server/_core/llm.ts invokes the configured model gateway
+  → typed reply returns through tRPC
+  → Home.tsx appends the assistant message to the conversation
 ```
 
-This design keeps model credentials out of the frontend and constrains each request with validated message and history limits.
+This structure keeps model credentials out of the frontend, limits the request payload through Zod validation, and makes the API behavior directly testable through `server/routers.chat.test.ts`.
 
 ## Deployment notes
 
