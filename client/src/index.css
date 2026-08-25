@@ -188,17 +188,19 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-40
 .suggestion-card:hover .suggestion-arrow { transform: translateX(-3px); color: var(--coral-400); }
 
 .composer-dock { padding: 0 clamp(30px, 6vw, 108px) 23px; }
-.composer-form { position: relative; padding: 13px 15px 10px; border: 1px solid rgba(242, 235, 221, 0.17); border-radius: 2px; background-color: rgba(242, 235, 221, 0.105); background-image: url("/manus-storage/marokecho-paper-texture_faf053d9.png"); background-size: 420px; box-shadow: inset 0 -2px 0 var(--coral-500), 0 18px 38px rgba(0, 0, 0, 0.16); }
-.composer-topline { justify-content: space-between; color: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; }
-.composer-topline span:first-child { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-300); }
+.composer-form { position: relative; padding: 13px 15px 10px; border: 1px solid rgba(242, 235, 221, 0.24); border-radius: 2px; background-color: rgba(251, 248, 241, 0.94); background-image: linear-gradient(rgba(251, 248, 241, 0.78), rgba(251, 248, 241, 0.78)), url("/manus-storage/marokecho-paper-texture_faf053d9.png"); background-size: 420px; box-shadow: inset 0 -2px 0 var(--coral-500), 0 18px 38px rgba(0, 0, 0, 0.16); }
+.composer-topline { justify-content: space-between; color: #4b5359; font-family: var(--font-mono); font-size: 9px; }
+.composer-topline span:first-child { display: inline-flex; align-items: center; gap: 6px; color: #52603a; }
 .composer-line { display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
-.composer-line textarea { min-height: 47px; max-height: 170px; flex: 1; resize: vertical; padding: 7px 0; border: 0; outline: 0; color: var(--paper-50); background: transparent; font-size: 14px; line-height: 1.8; }
-.composer-line textarea::placeholder { color: var(--ink-muted); }
+.composer-line textarea { min-height: 47px; max-height: 170px; flex: 1; resize: vertical; padding: 7px 0; border: 0; outline: 0; color: var(--ink-950) !important; -webkit-text-fill-color: var(--ink-950); caret-color: var(--coral-500); background: transparent; font-size: 15px; font-weight: 500; line-height: 1.8; text-shadow: none; }
+.composer-line textarea::placeholder { color: #56616a; opacity: 1; -webkit-text-fill-color: #56616a; }
+.composer-line textarea:focus::placeholder { opacity: 0.72; }
+.composer-line textarea:-webkit-autofill, .composer-line textarea:-webkit-autofill:hover, .composer-line textarea:-webkit-autofill:focus { -webkit-text-fill-color: var(--ink-950); box-shadow: 0 0 0 1000px var(--paper-50) inset; }
 .send-button { display: grid; flex: 0 0 auto; width: 37px; height: 37px; place-items: center; border-radius: 2px; color: var(--ink-950); background: var(--coral-500); cursor: pointer; transition: transform 160ms var(--ease-out), background 160ms var(--ease-out), opacity 160ms var(--ease-out); }
 .send-button:hover { background: var(--coral-400); transform: translateY(-2px); }
 .send-button:active { transform: scale(0.97); }
 .send-button:disabled { cursor: default; opacity: 0.35; }
-.composer-footer { gap: 16px; margin-top: 2px; color: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; }
+.composer-footer { gap: 16px; margin-top: 2px; color: #4b5359; font-family: var(--font-mono); font-size: 9px; }
 .composer-model { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; direction: ltr; }
 .composer-shortcuts { gap: 16px; padding: 9px 3px 0; }
 .composer-shortcuts button { display: inline-flex; align-items: center; gap: 6px; padding: 0; color: var(--ink-faint); background: transparent; font-size: 10px; cursor: pointer; transition: color 180ms var(--ease-out); }
