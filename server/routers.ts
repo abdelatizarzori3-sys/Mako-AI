@@ -4,7 +4,9 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { invokeLLM } from "./_core/llm";
+import { transcribeAudio } from "./_core/voiceTranscription";
 import { systemRouter } from "./_core/systemRouter";
+import { storageGetSignedUrl, storagePut } from "./storage";
 import { publicProcedure, router } from "./_core/trpc";
 
 const chatMessage = z.object({
@@ -36,7 +38,7 @@ export const appRouter = router({
             messages: [
               {
                 role: "system",
-                content: "You are Marokecho, a calm, incisive AI thinking companion. Reply in clear English only. Be practical and structured, but avoid unnecessary headings. If a request is ambiguous, ask one focused clarifying question. Do not claim to have taken actions you cannot take.",
+                content: "You are Marokecho, a calm but powerful AI thinking companion. Reply in clear English only unless the user asks for another language. Start with the direct answer, then add the most useful reasoning, concrete steps, trade-offs, and a concise next action. Use Markdown when it improves scanability: short headings, bullets, numbered steps, code fences, and tables. Tailor the depth to the question, avoid filler and repetition, and never bury the answer in generic preambles. If a request is ambiguous, ask one focused clarifying question. Be explicit about assumptions and uncertainty. Do not claim to have taken actions, accessed accounts, used tools, or verified results you cannot actually verify.",
               },
               ...input.history,
               { role: "user", content: input.message },
@@ -56,6 +58,33 @@ export const appRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message: "Marokecho could not generate a reply right now. Please try again.",
           });
+        }
+      }),
+  }),
+  voice: router({
+    transcribe: publicProcedure
+      .input(z.object({
+        audioBase64: z.string().min(1).max(11_200_000),
+        mimeType: z.enum(["audio/webm", "audio/ogg", "audio/mp4", "audio/wav", "audio/mpeg"]),
+        language: z.string().trim().min(2).max(8).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const audio = Buffer.from(input.audioBase64, "base64");
+          if (!audio.length || audio.length > 8 * 1024 * 1024) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Voice clips must be between 1 byte and 8 MB." });
+          }
+          const uploaded = await storagePut(`voice/marokecho-${Date.now()}.webm`, audio, input.mimeType);
+          const signedUrl = await storageGetSignedUrl(uploaded.key);
+          const result = await transcribeAudio({ audioUrl: signedUrl, language: input.language, prompt: "Transcribe the user's voice accurately. Preserve intent and punctuation." });
+          if ("error" in result) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+          }
+          return { text: result.text, language: result.language, duration: result.duration };
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          console.error("[Marokecho Voice] transcription failed", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Voice transcription is temporarily unavailable. Please try again." });
         }
       }),
   }),

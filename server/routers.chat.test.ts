@@ -7,6 +7,21 @@ vi.mock("./_core/llm", () => ({
   }),
 }));
 
+vi.mock("./_core/voiceTranscription", () => ({
+  transcribeAudio: vi.fn().mockResolvedValue({
+    task: "transcribe",
+    language: "en",
+    duration: 1.2,
+    text: "A voice test signal.",
+    segments: [],
+  }),
+}));
+
+vi.mock("./storage", () => ({
+  storagePut: vi.fn().mockResolvedValue({ key: "voice/test.webm", url: "/manus-storage/voice/test.webm" }),
+  storageGetSignedUrl: vi.fn().mockResolvedValue("https://storage.example.test/voice/test.webm"),
+}));
+
 import { appRouter } from "./routers";
 
 describe("ai.chat", () => {
@@ -20,5 +35,19 @@ describe("ai.chat", () => {
   it("rejects an empty message before calling the model", async () => {
     const caller = appRouter.createCaller({} as never);
     await expect(caller.ai.chat({ message: "   " })).rejects.toThrow("Enter a message.");
+  });
+});
+
+describe("voice.transcribe", () => {
+  it("transcribes a supported audio clip without exposing storage credentials", async () => {
+    const caller = appRouter.createCaller({} as never);
+    const result = await caller.voice.transcribe({
+      audioBase64: Buffer.from("audio bytes").toString("base64"),
+      mimeType: "audio/webm",
+      language: "en",
+    });
+
+    expect(result).toMatchObject({ text: "A voice test signal.", language: "en" });
+    expect(result).not.toHaveProperty("audioUrl");
   });
 });

@@ -28,6 +28,19 @@ Configure the following variables in the hosting provider dashboard. Do not comm
 
 The application listens on the platform-provided `PORT` value. Do not set a fixed port unless the platform specifically requires one.
 
+## GitHub Actions and GitHub Container Registry
+
+The repository includes two workflows under `.github/workflows/`. `ci.yml` runs on pushes and pull requests to `main`, performs dependency installation, TypeScript checks, Vitest tests, the production bundle, and a Docker image build. `publish-image.yml` publishes a Docker image to GitHub Container Registry only when a version tag matching `v*.*.*` is pushed or when it is started manually from the Actions tab. It uses the built-in `GITHUB_TOKEN`; no model or database secret is stored in the repository.
+
+To publish an image, create a release tag locally and push it:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The image is published as `ghcr.io/abdelatizarzori3-sys/mako-ai`. Configure its package visibility in GitHub according to your deployment needs, then deploy that image on any OCI-compatible platform. The application still needs its runtime environment variables, especially `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`, and `JWT_SECRET`.
+
 ## Docker-compatible platforms
 
 Build and run the image locally for a pre-deployment smoke test:

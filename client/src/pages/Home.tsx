@@ -3,6 +3,9 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   BookOpen,
+  Loader2,
+  Mic,
+  Square,
   Check,
   ChevronLeft,
   CircleHelp,
@@ -29,6 +32,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Streamdown } from "streamdown";
 import { trpc } from "@/lib/trpc";
 
 const MARK_URL = "/manus-storage/marokecho-mark_ac6cc349.png";
@@ -69,7 +73,12 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const streamEndRef = useRef<HTMLDivElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const chat = trpc.ai.chat.useMutation();
+  const voice = trpc.voice.transcribe.useMutation();
 
   useEffect(() => {
     if (!notice) return;
@@ -77,11 +86,73 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => {
+    streamEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, chat.isPending]);
+
+  useEffect(() => () => recorderRef.current?.stop(), []);
+
   const lastUserMessage = useMemo(() => [...messages].reverse().find((message) => message.role === "user"), [messages]);
 
   const focusComposer = (value = "") => {
     setComposer(value);
     window.setTimeout(() => composerRef.current?.focus(), 0);
+  };
+
+  const toggleVoiceCapture = async () => {
+    if (isRecording) {
+      recorderRef.current?.stop();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setNotice("Voice capture is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size > 8 * 1024 * 1024) {
+          setNotice("Voice clips must be shorter than 8 MB.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = String(reader.result || "");
+          const audioBase64 = dataUrl.split(",")[1] || "";
+          try {
+            const result = await voice.mutateAsync({
+              audioBase64,
+              mimeType: recorder.mimeType.startsWith("audio/ogg") ? "audio/ogg" : recorder.mimeType.startsWith("audio/mp4") ? "audio/mp4" : "audio/webm",
+              language: "en",
+            });
+            setComposer((current) => current ? `${current.trim()} ${result.text}` : result.text);
+            window.setTimeout(() => composerRef.current?.focus(), 0);
+          } catch (error) {
+            console.error(error);
+            setNotice("Voice transcription is temporarily unavailable. Please try again.");
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      setNotice("Listening… press the microphone again when you are done.");
+    } catch (error) {
+      console.error(error);
+      setNotice("Microphone access was denied or unavailable.");
+    }
   };
 
   const sendMessage = async (event?: FormEvent) => {
@@ -168,10 +239,11 @@ export default function Home() {
             {messages.map((message) => (
               <article key={message.id} className={`message-row ${message.role === "user" ? "from-user" : "from-assistant"}`}>
                 <div className="message-avatar">{message.role === "assistant" ? <img src={MARK_URL} alt="" className="message-mark" /> : "YOU"}</div>
-                <div className="message-body"><div className="message-meta"><strong>{message.role === "assistant" ? "Marokecho" : "You"}</strong><span>{message.time}</span></div><div className="message-bubble">{message.text}</div>{message.role === "assistant" && <button className="copy-button" onClick={() => copyMessage(message)}>{copiedId === message.id ? <Check size={13} /> : <Copy size={13} />}{copiedId === message.id ? "Copied" : "Copy reply"}</button>}</div>
+                <div className="message-body"><div className="message-meta"><strong>{message.role === "assistant" ? "Marokecho" : "You"}</strong><span>{message.time}</span></div><div className={`message-bubble ${message.role === "assistant" ? "assistant-markdown" : ""}`}>{message.role === "assistant" ? <Streamdown>{message.text}</Streamdown> : message.text}</div>{message.role === "assistant" && <button className="copy-button" onClick={() => void copyMessage(message)}>{copiedId === message.id ? <Check size={13} /> : <Copy size={13} />}{copiedId === message.id ? "Copied" : "Copy reply"}</button>}</div>
               </article>
             ))}
             {chat.isPending && <article className="message-row from-assistant thinking-row"><div className="message-avatar"><img src={MARK_URL} alt="" className="message-mark" /></div><div className="message-body"><div className="message-meta"><strong>Marokecho</strong><span>Thinking</span></div><div className="thinking-bubble"><i /><i /><i /></div></div></article>}
+            <div ref={streamEndRef} aria-hidden="true" />
           </div>
 
           {messages.length === 1 && <section className="suggestion-zone"><div className="section-label"><span /> Suggested signals <span /></div><div className="suggestion-list">{suggestions.map(({ icon: Icon, label, prompt }) => <button className="suggestion-card" key={label} onClick={() => focusComposer(prompt)}><span className="suggestion-icon"><Icon size={18} /></span><span>{label}</span><ChevronLeft size={16} className="suggestion-arrow" /></button>)}</div></section>}
@@ -179,9 +251,9 @@ export default function Home() {
 
         <div className="composer-dock">
           <form className="composer-form" onSubmit={sendMessage}>
-            <div className="composer-topline"><span><Radio size={14} /> Secure thinking space</span><span>{composer.length}/3000</span></div>
-            <div className="composer-line"><Textarea ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Write the first signal..." maxLength={3000} aria-label="Your message to Marokecho" /><Button className="send-button" type="submit" disabled={!composer.trim() || chat.isPending} aria-label="Send message"><ArrowUp size={19} /></Button></div>
-            <div className="composer-footer"><span>Enter to send</span><span>Shift + Enter for a new line</span><span className="composer-model"><span className="status-dot" /> {chat.isPending ? "Marokecho is thinking" : "GPT-5 mini · secure server"}</span></div>
+            <div className="composer-topline"><span><Radio size={14} /> Secure thinking space</span><span className="composer-count">{composer.length}/3000</span></div>
+            <div className="composer-line"><Textarea ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder={isRecording ? "Listening for your signal…" : "Write the first signal…"} maxLength={3000} aria-label="Your message to Marokecho" /><button className={`voice-button ${isRecording ? "is-recording" : ""}`} type="button" onClick={() => void toggleVoiceCapture()} disabled={voice.isPending} aria-label={isRecording ? "Stop voice capture" : "Start voice capture"}>{voice.isPending ? <Loader2 size={17} className="spin-icon" /> : isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}</button><Button className="send-button" type="submit" disabled={!composer.trim() || chat.isPending || isRecording} aria-label="Send message"><ArrowUp size={19} /></Button></div>
+            <div className="composer-footer"><span>Enter to send</span><span>Shift + Enter for a new line</span><span className="composer-model"><span className={`status-dot ${isRecording ? "recording-dot" : ""}`} /> {voice.isPending ? "Transcribing voice" : chat.isPending ? "Marokecho is thinking" : isRecording ? "Listening" : "GPT-5 mini · secure server"}</span></div>
           </form>
           <div className="composer-shortcuts"><button type="button" onClick={newThread}><SquarePen size={15} /> New thread</button><button type="button" onClick={() => setNotice("File context will be available in the next workspace update.")}><Plus size={15} /> Add context</button></div>
         </div>
