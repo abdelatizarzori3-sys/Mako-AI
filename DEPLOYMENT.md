@@ -41,6 +41,10 @@ git push origin v1.0.0
 
 The image is published as `ghcr.io/abdelatizarzori3-sys/mako-ai`. Configure its package visibility in GitHub according to your deployment needs, then deploy that image on any OCI-compatible platform. The application still needs its runtime environment variables, especially `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`, and `JWT_SECRET`.
 
+### GitHub Pages limitation
+
+GitHub Pages serves the static Vite frontend only. It does not run the Express/tRPC server, protect server-side model credentials, process voice transcription, or provide the `/api/trpc` endpoints. Use the Manus deployment or an OCI-compatible Docker host for live chat, structured task handling, and voice transcription. The Pages URL is useful as a static UI preview; configure the production API origin through a server-aware deployment rather than exposing secrets in browser code.
+
 ## Docker-compatible platforms
 
 Build and run the image locally for a pre-deployment smoke test:
