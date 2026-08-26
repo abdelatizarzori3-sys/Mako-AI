@@ -71,6 +71,58 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [composer, setComposer] = useState("");
   const isStaticPreview = typeof window !== "undefined" && window.location.hostname.endsWith("github.io");
+  const uiText = language === "ar" ? {
+    engineReady: "المحرك جاهز",
+    exploration: "استكشاف / 01",
+    startingPoint: "نقطة البداية · 01",
+    heroTitle: <>حوّل الفضول<br />إلى <em>طريق واضح.</em></>,
+    heroDescription: "مساحة هادئة لترتيب الفكرة وفهم السياق والانتقال بخطوة مقصودة.",
+    welcome: "أنا ماروكيتشو. اكتب سؤالك أو فكرتك أو ملاحظتك الأولية، وسأحوّلها إلى خطوة تالية واضحة وقابلة للتنفيذ.",
+    secureSpace: "مساحة تفكير آمنة",
+    placeholder: "اكتب أول فكرة…",
+    listeningPlaceholder: "أستمع إلى صوتك…",
+    send: "إرسال الرسالة",
+    startVoice: "بدء التسجيل الصوتي",
+    stopVoice: "إيقاف التسجيل الصوتي",
+    staticChat: "هذه نسخة عرض ثابتة. استخدم خادم Manus للمحادثة والصوت.",
+    staticVoice: "التسجيل الصوتي يحتاج خادم Manus أو خادم Docker. استخدم النسخة المنشورة الكاملة.",
+    transcribing: "جارٍ تحويل الصوت إلى نص",
+    thinking: "ماروكيتشو يفكّر",
+    listening: "يستمع الآن",
+    secureServer: "خادم Manus الآمن",
+    enterToSend: "اضغط Enter للإرسال",
+    newLine: "Shift + Enter لسطر جديد",
+    newThread: "محادثة جديدة",
+    addContext: "إضافة سياق",
+    copy: "نسخ الرد",
+    copied: "تم النسخ",
+  } : {
+    engineReady: "AI engine ready",
+    exploration: "EXPLORATION / 01",
+    startingPoint: "Starting point · 01",
+    heroTitle: <>Turn curiosity<br />into a <em>clear route.</em></>,
+    heroDescription: "A calm working space to frame the thought, sort the context, and move with intent.",
+    welcome: initialMessages[0].text,
+    secureSpace: "Secure thinking space",
+    placeholder: "Write the first signal…",
+    listeningPlaceholder: "Listening for your signal…",
+    send: "Send message",
+    startVoice: "Start voice capture",
+    stopVoice: "Stop voice capture",
+    staticChat: "This is a static preview. Use the Manus server for chat and voice.",
+    staticVoice: "Voice transcription requires the Manus or Docker backend. Use the full deployment.",
+    transcribing: "Transcribing voice",
+    thinking: "Marokecho is thinking",
+    listening: "Listening",
+    secureServer: "GPT-5 mini · secure server",
+    enterToSend: "Enter to send",
+    newLine: "Shift + Enter for a new line",
+    newThread: "New thread",
+    addContext: "Add context",
+    copy: "Copy reply",
+    copied: "Copied",
+  };
+
   const [activeMode, setActiveMode] = useState<PanelMode>("overview");
   const [panelOpen, setPanelOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -86,7 +138,8 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
-  }, [language]);
+    setMessages((current) => current.map((message) => message.id === "welcome" ? { ...message, text: uiText.welcome } : message));
+  }, [language, uiText.welcome]);
 
   useEffect(() => {
     if (!notice) return;
@@ -113,8 +166,13 @@ export default function Home() {
       return;
     }
 
+    if (isStaticPreview) {
+      setNotice(uiText.staticVoice);
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setNotice("Voice capture is not supported in this browser.");
+      setNotice(language === "ar" ? "التسجيل الصوتي غير مدعوم في هذا المتصفح." : "Voice capture is not supported in this browser.");
       return;
     }
 
@@ -131,7 +189,7 @@ export default function Home() {
         setIsRecording(false);
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size > 8 * 1024 * 1024) {
-          setNotice("Voice clips must be shorter than 8 MB.");
+          setNotice(language === "ar" ? "يجب أن يكون المقطع الصوتي أقصر من 8 ميغابايت." : "Voice clips must be shorter than 8 MB.");
           return;
         }
         const reader = new FileReader();
@@ -148,7 +206,7 @@ export default function Home() {
             window.setTimeout(() => composerRef.current?.focus(), 0);
           } catch (error) {
             console.error(error);
-            setNotice("Voice transcription is temporarily unavailable. Please try again.");
+            setNotice(language === "ar" ? "تعذر تحويل الصوت إلى نص مؤقتًا. حاول مرة أخرى." : "Voice transcription is temporarily unavailable. Please try again.");
           }
         };
         reader.readAsDataURL(blob);
@@ -156,10 +214,10 @@ export default function Home() {
       recorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
-      setNotice("Listening… press the microphone again when you are done.");
+      setNotice(language === "ar" ? "أستمع الآن… اضغط الميكروفون مرة أخرى عند الانتهاء." : "Listening… press the microphone again when you are done.");
     } catch (error) {
       console.error(error);
-      setNotice("Microphone access was denied or unavailable.");
+      setNotice(language === "ar" ? "تم رفض إذن الميكروفون أو أنه غير متاح." : "Microphone access was denied or unavailable.");
     }
   };
 
@@ -168,7 +226,7 @@ export default function Home() {
     const content = composer.trim();
     if (!content || chat.isPending) return;
     if (isStaticPreview) {
-      setNotice(language === "ar" ? "هذه نسخة عرض ثابتة. استخدم خادم Manus للمحادثة والصوت." : "This is a static preview. Use the Manus server for chat and voice.");
+      setNotice(uiText.staticChat);
       return;
     }
 
@@ -207,7 +265,16 @@ export default function Home() {
     window.setTimeout(() => setCopiedId(null), 1600);
   };
 
-  const navItems: Array<{ id: PanelMode; label: string; icon: typeof MessageCircle }> = [
+  const localizedSuggestions = language === "ar" ? [
+    { icon: TerminalSquare, label: "صمّم منتجًا", prompt: "ساعدني في تصميم بنية منتج ويب قابل للتوسع." },
+    { icon: BookOpen, label: "اشرح الجزء الصعب", prompt: "اشرح مفهومًا معقدًا بلغة واضحة وعملية." },
+    { icon: Sparkles, label: "حوّل الملاحظات إلى خطة", prompt: "حوّل هذه الفكرة إلى خطة تنفيذ من خمس خطوات." },
+  ] : suggestions;
+  const navItems: Array<{ id: PanelMode; label: string; icon: typeof MessageCircle }> = language === "ar" ? [
+    { id: "overview", label: "الدردشة", icon: MessageCircle },
+    { id: "history", label: "الأرشيف", icon: History },
+    { id: "saved", label: "المحفوظات", icon: FolderOpen },
+  ] : [
     { id: "overview", label: "Chat", icon: MessageCircle },
     { id: "history", label: "Archive", icon: History },
     { id: "saved", label: "Saved", icon: FolderOpen },
@@ -228,7 +295,7 @@ export default function Home() {
           ))}
         </nav>
         <div className="rail-bottom">
-          <button className="rail-button" onClick={() => { setActiveMode("settings"); setPanelOpen(true); }} aria-label="Settings" title="Settings"><Settings2 size={19} strokeWidth={1.8} /><span>Settings</span></button>
+          <button className="rail-button" onClick={() => { setActiveMode("settings"); setPanelOpen(true); }} aria-label={language === "ar" ? "الإعدادات" : "Settings"} title={language === "ar" ? "الإعدادات" : "Settings"}><Settings2 size={19} strokeWidth={1.8} /><span>{language === "ar" ? "الإعدادات" : "Settings"}</span></button>
           <div className="rail-avatar" aria-label="Marokecho account">M</div>
         </div>
       </aside>
@@ -236,38 +303,38 @@ export default function Home() {
       <section className="conversation-column">
         <header className="topbar">
           <div className="mobile-brand"><img src={MARK_URL} alt="" className="brand-mark" /><span>Marokecho</span></div>
-          <div className="topbar-meta"><span className="live-pulse"><i /> AI engine ready</span><span className="topbar-separator" /><span className="session-label">EXPLORATION / 01</span></div>
+          <div className="topbar-meta"><span className="live-pulse"><i /> {uiText.engineReady}</span><span className="topbar-separator" /><span className="session-label">{uiText.exploration}</span></div>
           <div className="topbar-actions"><button className="icon-button mobile-only" onClick={() => setPanelOpen((open) => !open)} aria-label="Open context panel">{panelOpen ? <X size={18} /> : <Menu size={18} />}</button><button type="button" className="language-switch" onClick={() => setLanguage((current) => current === "en" ? "ar" : "en")} aria-label={language === "en" ? "Switch to Arabic" : "التبديل إلى الإنجليزية"}><Globe2 size={16} /> {language === "en" ? "EN" : "ع"}</button><button className="icon-button" onClick={() => setNotice("No new notifications.")} aria-label="Help"><CircleHelp size={18} /></button></div>
         </header>
 
         <div className="conversation-scroll">
           <section className="conversation-intro" style={{ backgroundImage: `url(${HERO_URL})` }}>
-            <div className="intro-kicker"><span className="kicker-rule" /> Starting point · 01 <span className="kicker-rule" /></div>
-            <h1>Turn curiosity<br />into a <em>clear route.</em></h1>
-            <p>A calm working space to frame the thought, sort the context, and move with intent.</p>
+            <div className="intro-kicker"><span className="kicker-rule" /> {uiText.startingPoint} <span className="kicker-rule" /></div>
+            <h1>{uiText.heroTitle}</h1>
+            <p>{uiText.heroDescription}</p>
           </section>
 
           <div className="message-stream" aria-live="polite">
             {messages.map((message) => (
               <article key={message.id} className={`message-row ${message.role === "user" ? "from-user" : "from-assistant"}`}>
-                <div className="message-avatar">{message.role === "assistant" ? <img src={MARK_URL} alt="" className="message-mark" /> : "YOU"}</div>
-                <div className="message-body"><div className="message-meta"><strong>{message.role === "assistant" ? "Marokecho" : "You"}</strong><span>{message.time}</span></div><div className={`message-bubble ${message.role === "assistant" ? "assistant-markdown" : ""}`}>{message.role === "assistant" ? <Streamdown>{message.text}</Streamdown> : message.text}</div>{message.role === "assistant" && <button className="copy-button" onClick={() => void copyMessage(message)}>{copiedId === message.id ? <Check size={13} /> : <Copy size={13} />}{copiedId === message.id ? "Copied" : "Copy reply"}</button>}</div>
+                <div className="message-avatar">{message.role === "assistant" ? <img src={MARK_URL} alt="" className="message-mark" /> : language === "ar" ? "أنت" : "YOU"}</div>
+                <div className="message-body"><div className="message-meta"><strong>{message.role === "assistant" ? "Marokecho" : language === "ar" ? "أنت" : "You"}</strong><span>{message.time}</span></div><div className={`message-bubble ${message.role === "assistant" ? "assistant-markdown" : ""}`}>{message.role === "assistant" ? <Streamdown>{message.text}</Streamdown> : message.text}</div>{message.role === "assistant" && <button className="copy-button" onClick={() => void copyMessage(message)}>{copiedId === message.id ? <Check size={13} /> : <Copy size={13} />}{copiedId === message.id ? uiText.copied : uiText.copy}</button>}</div>
               </article>
             ))}
-            {chat.isPending && <article className="message-row from-assistant thinking-row"><div className="message-avatar"><img src={MARK_URL} alt="" className="message-mark" /></div><div className="message-body"><div className="message-meta"><strong>Marokecho</strong><span>Thinking</span></div><div className="thinking-bubble"><i /><i /><i /></div></div></article>}
+            {chat.isPending && <article className="message-row from-assistant thinking-row"><div className="message-avatar"><img src={MARK_URL} alt="" className="message-mark" /></div><div className="message-body"><div className="message-meta"><strong>Marokecho</strong><span>{uiText.thinking}</span></div><div className="thinking-bubble"><i /><i /><i /></div></div></article>}
             <div ref={streamEndRef} aria-hidden="true" />
           </div>
 
-          {messages.length === 1 && <section className="suggestion-zone"><div className="section-label"><span /> Suggested signals <span /></div><div className="suggestion-list">{suggestions.map(({ icon: Icon, label, prompt }) => <button className="suggestion-card" key={label} onClick={() => focusComposer(prompt)}><span className="suggestion-icon"><Icon size={18} /></span><span>{label}</span><ChevronLeft size={16} className="suggestion-arrow" /></button>)}</div></section>}
+          {messages.length === 1 && <section className="suggestion-zone"><div className="section-label"><span /> {language === "ar" ? "اقتراحات مفيدة" : "Suggested signals"} <span /></div><div className="suggestion-list">{localizedSuggestions.map(({ icon: Icon, label, prompt }) => <button className="suggestion-card" key={label} onClick={() => focusComposer(prompt)}><span className="suggestion-icon"><Icon size={18} /></span><span>{label}</span><ChevronLeft size={16} className="suggestion-arrow" /></button>)}</div></section>}
         </div>
 
         <div className="composer-dock">
           <form className="composer-form" onSubmit={sendMessage}>
-            <div className="composer-topline"><span><Radio size={14} /> Secure thinking space</span><span className="composer-count">{composer.length}/3000</span></div>
-            <div className="composer-line"><Textarea ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder={isRecording ? "Listening for your signal…" : "Write the first signal…"} maxLength={3000} aria-label="Your message to Marokecho" /><button className={`voice-button ${isRecording ? "is-recording" : ""}`} type="button" onClick={() => void toggleVoiceCapture()} disabled={voice.isPending} aria-label={isRecording ? "Stop voice capture" : "Start voice capture"}>{voice.isPending ? <Loader2 size={17} className="spin-icon" /> : isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}</button><Button className="send-button" type="submit" disabled={!composer.trim() || chat.isPending || isRecording} aria-label="Send message"><ArrowUp size={19} /></Button></div>
-            <div className="composer-footer"><span>Enter to send</span><span>Shift + Enter for a new line</span><span className="composer-model"><span className={`status-dot ${isRecording ? "recording-dot" : ""}`} /> {voice.isPending ? "Transcribing voice" : chat.isPending ? "Marokecho is thinking" : isRecording ? "Listening" : "GPT-5 mini · secure server"}</span></div>
+            <div className="composer-topline"><span><Radio size={14} /> {uiText.secureSpace}</span><span className="composer-count">{composer.length}/3000</span></div>
+            <div className="composer-line"><Textarea ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder={isRecording ? uiText.listeningPlaceholder : uiText.placeholder} maxLength={3000} aria-label="Your message to Marokecho" /><button className={`voice-button ${isRecording ? "is-recording" : ""}`} type="button" onClick={() => void toggleVoiceCapture()} disabled={voice.isPending} aria-label={isRecording ? uiText.stopVoice : uiText.startVoice}>{voice.isPending ? <Loader2 size={17} className="spin-icon" /> : isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}</button><Button className="send-button" type="submit" disabled={!composer.trim() || chat.isPending || isRecording} aria-label={uiText.send}><ArrowUp size={19} /></Button></div>
+            <div className="composer-footer"><span>{uiText.enterToSend}</span><span>{uiText.newLine}</span><span className="composer-model"><span className={`status-dot ${isRecording ? "recording-dot" : ""}`} /> {isStaticPreview ? (language === "ar" ? "نسخة واجهة فقط" : "Frontend preview only") : voice.isPending ? uiText.transcribing : chat.isPending ? uiText.thinking : isRecording ? uiText.listening : uiText.secureServer}</span></div>
           </form>
-          <div className="composer-shortcuts"><button type="button" onClick={newThread}><SquarePen size={15} /> New thread</button><button type="button" onClick={() => setNotice("File context will be available in the next workspace update.")}><Plus size={15} /> Add context</button></div>
+          <div className="composer-shortcuts"><button type="button" onClick={newThread}><SquarePen size={15} /> {uiText.newThread}</button><button type="button" onClick={() => setNotice(language === "ar" ? "إضافة الملفات ستتوفر في تحديث مساحة العمل القادم." : "File context will be available in the next workspace update.")}><Plus size={15} /> {uiText.addContext}</button></div>
         </div>
       </section>
 
