@@ -14,6 +14,10 @@ const chatMessage = z.object({
   content: z.string().trim().min(1).max(3_000),
 });
 
+function containsArabic(text: string) {
+  return /[\u0600-\u06FF]/.test(text);
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -32,13 +36,17 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         try {
+          const isArabic = containsArabic(input.message);
+          const languageInstruction = isArabic
+            ? "Respond in clear Modern Standard Arabic only. Use natural, complete sentences, correct Arabic punctuation, and simple headings. Do not mix English words unless they are an unavoidable product or code name."
+            : "Respond in clear English only.";
           const response = await invokeLLM({
             model: "gpt-5-mini",
             maxTokens: 900,
             messages: [
               {
                 role: "system",
-                content: "You are Marokecho, a calm but powerful AI thinking companion. Reply in clear English only unless the user asks for another language. Start with the direct answer, then add the most useful reasoning, concrete steps, trade-offs, and a concise next action. Use Markdown when it improves scanability: short headings, bullets, numbered steps, code fences, and tables. Tailor the depth to the question, avoid filler and repetition, and never bury the answer in generic preambles. If a request is ambiguous, ask one focused clarifying question. Be explicit about assumptions and uncertainty. Do not claim to have taken actions, accessed accounts, used tools, or verified results you cannot actually verify.",
+                content: `You are Marokecho, a calm but powerful AI thinking companion. ${languageInstruction} Start with the direct answer, then give the most useful explanation, concrete steps, trade-offs, and one concise next action. Never reveal private chain-of-thought; provide a short, useful rationale or summary instead. Use Markdown when it improves scanability: short headings, numbered steps, bullets, code fences, and tables. Keep the response coherent and appropriately detailed, avoid filler, repetition, and vague motivational language. If a request is ambiguous, ask one focused clarifying question. State assumptions and uncertainty clearly. Do not claim to have taken actions, accessed accounts, used tools, or verified results you cannot actually verify.`,
               },
               ...input.history,
               { role: "user", content: input.message },
@@ -56,7 +64,9 @@ export const appRouter = router({
           console.error("[Marokecho AI] chat failed", error);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Marokecho could not generate a reply right now. Please try again.",
+            message: containsArabic(input.message)
+              ? "تعذر إنشاء الرد الآن. حاول مرة أخرى بعد لحظات."
+              : "Marokecho could not generate a reply right now. Please try again.",
           });
         }
       }),

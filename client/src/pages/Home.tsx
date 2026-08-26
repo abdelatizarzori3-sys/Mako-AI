@@ -35,9 +35,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Streamdown } from "streamdown";
 import { trpc } from "@/lib/trpc";
 
-const MARK_URL = "/manus-storage/marokecho-mark_ac6cc349.png";
-const HERO_URL = "/manus-storage/marokecho-atlas-hero_162916b8.png";
-const CARD_URL = "/manus-storage/marokecho-signal-card_2cf9ee52.png";
+const STATIC_ASSET_ORIGIN = typeof window !== "undefined" && window.location.hostname.endsWith("github.io") ? "https://marokecho-jrrh7cuh.manus.space" : "";
+const MARK_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-mark_ac6cc349.png`;
+const HERO_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-atlas-hero_162916b8.png`;
+const CARD_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-signal-card_2cf9ee52.png`;
 
 const suggestions = [
   { icon: TerminalSquare, label: "Architect a product", prompt: "Help me design the architecture for a scalable web product." },
@@ -66,8 +67,10 @@ function timeLabel() {
 }
 
 export default function Home() {
+  const [language, setLanguage] = useState<"en" | "ar">(() => typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ar") ? "ar" : "en");
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [composer, setComposer] = useState("");
+  const isStaticPreview = typeof window !== "undefined" && window.location.hostname.endsWith("github.io");
   const [activeMode, setActiveMode] = useState<PanelMode>("overview");
   const [panelOpen, setPanelOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -79,6 +82,11 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const chat = trpc.ai.chat.useMutation();
   const voice = trpc.voice.transcribe.useMutation();
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  }, [language]);
 
   useEffect(() => {
     if (!notice) return;
@@ -134,7 +142,7 @@ export default function Home() {
             const result = await voice.mutateAsync({
               audioBase64,
               mimeType: recorder.mimeType.startsWith("audio/ogg") ? "audio/ogg" : recorder.mimeType.startsWith("audio/mp4") ? "audio/mp4" : "audio/webm",
-              language: "en",
+              language,
             });
             setComposer((current) => current ? `${current.trim()} ${result.text}` : result.text);
             window.setTimeout(() => composerRef.current?.focus(), 0);
@@ -159,6 +167,10 @@ export default function Home() {
     event?.preventDefault();
     const content = composer.trim();
     if (!content || chat.isPending) return;
+    if (isStaticPreview) {
+      setNotice(language === "ar" ? "هذه نسخة عرض ثابتة. استخدم خادم Manus للمحادثة والصوت." : "This is a static preview. Use the Manus server for chat and voice.");
+      return;
+    }
 
     const userMessage: Message = { id: `user-${Date.now()}`, role: "user", time: timeLabel(), text: content };
     const history = messages
@@ -177,7 +189,7 @@ export default function Home() {
       ]);
     } catch (error) {
       console.error(error);
-      setNotice("The reply is temporarily unavailable. Please try again.");
+      setNotice(language === "ar" ? "تعذر الوصول إلى خادم الردود. حاول مرة أخرى من نسخة Manus." : "The reply is temporarily unavailable. Try again from the Manus deployment.");
     }
   };
 
@@ -202,7 +214,7 @@ export default function Home() {
   ];
 
   return (
-    <main className="marokecho-shell" dir="ltr">
+    <main dir={language === "ar" ? "rtl" : "ltr"} className={language === "ar" ? "marokecho-shell rtl-ui" : "marokecho-shell"}>
       <aside className="brand-rail" aria-label="Main navigation">
         <div className="rail-brand">
           <div className="mark-frame"><img src={MARK_URL} alt="Marokecho compass mark" className="brand-mark" /></div>
@@ -225,7 +237,7 @@ export default function Home() {
         <header className="topbar">
           <div className="mobile-brand"><img src={MARK_URL} alt="" className="brand-mark" /><span>Marokecho</span></div>
           <div className="topbar-meta"><span className="live-pulse"><i /> AI engine ready</span><span className="topbar-separator" /><span className="session-label">EXPLORATION / 01</span></div>
-          <div className="topbar-actions"><button className="icon-button mobile-only" onClick={() => setPanelOpen((open) => !open)} aria-label="Open context panel">{panelOpen ? <X size={18} /> : <Menu size={18} />}</button><span className="language-switch"><Globe2 size={16} /> EN</span><button className="icon-button" onClick={() => setNotice("No new notifications.")} aria-label="Help"><CircleHelp size={18} /></button></div>
+          <div className="topbar-actions"><button className="icon-button mobile-only" onClick={() => setPanelOpen((open) => !open)} aria-label="Open context panel">{panelOpen ? <X size={18} /> : <Menu size={18} />}</button><button type="button" className="language-switch" onClick={() => setLanguage((current) => current === "en" ? "ar" : "en")} aria-label={language === "en" ? "Switch to Arabic" : "التبديل إلى الإنجليزية"}><Globe2 size={16} /> {language === "en" ? "EN" : "ع"}</button><button className="icon-button" onClick={() => setNotice("No new notifications.")} aria-label="Help"><CircleHelp size={18} /></button></div>
         </header>
 
         <div className="conversation-scroll">

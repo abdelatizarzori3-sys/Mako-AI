@@ -168,6 +168,12 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-40
 .message-meta strong { color: var(--paper-200); font-size: 11px; font-weight: 600; }
 .from-user .message-meta { justify-content: flex-start; }
 .message-bubble { color: rgba(242, 235, 221, 0.84); font-size: 14px; line-height: 1.95; }
+.rtl-ui .conversation-intro, .rtl-ui .message-stream, .rtl-ui .suggestion-zone, .rtl-ui .composer-form, .rtl-ui .composer-shortcuts { text-align: right; }
+.rtl-ui .message-meta { justify-content: flex-start; }
+.rtl-ui .from-user .message-meta { justify-content: flex-end; }
+.rtl-ui .assistant-markdown ul, .rtl-ui .assistant-markdown ol { padding-right: 1.35em; padding-left: 0; }
+.rtl-ui .assistant-markdown blockquote { padding-right: 12px; padding-left: 0; border-right: 2px solid var(--coral-500); border-left: 0; }
+.rtl-ui .composer-topline, .rtl-ui .composer-footer { direction: rtl; }
 .assistant-markdown { max-width: 680px; }
 .assistant-markdown p { margin: 0 0 0.8em; }
 .assistant-markdown p:last-child { margin-bottom: 0; }
