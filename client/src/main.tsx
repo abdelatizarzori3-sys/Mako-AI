@@ -9,7 +9,9 @@ import { startLogin } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, "");
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, "");
+const isCapacitor = typeof window !== "undefined" && "Capacitor" in window;
+const apiBaseUrl = configuredApiBaseUrl || (isCapacitor ? "https://marokecho-jrrh7cuh.manus.space" : undefined);
 const trpcUrl = apiBaseUrl ? `${apiBaseUrl}/api/trpc` : "/api/trpc";
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {

@@ -249,7 +249,7 @@ export default function Home() {
       ]);
     } catch (error) {
       console.error(error);
-      setNotice(language === "ar" ? "تعذر الوصول إلى خادم الردود. حاول مرة أخرى من نسخة Manus." : "The reply is temporarily unavailable. Try again from the Manus deployment.");
+      setNotice(language === "ar" ? "تعذر الوصول إلى خادم الردود. تحقق من اتصال الإنترنت ثم أعد المحاولة." : "The reply server is unavailable. Check your internet connection and try again.");
     }
   };
 

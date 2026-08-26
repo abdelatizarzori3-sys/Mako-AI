@@ -4,14 +4,13 @@
 
 ## المتطلبات
 
-يتطلب البناء Android Studio أو Android SDK وJDK 21. قبل بناء الإنتاج، يجب ضبط عنوان الخادم العام لخدمات tRPC وOAuth، مع إبقاء أسرار OAuth وقاعدة البيانات وLLM على الخادم وعدم تضمينها في التطبيق.
+يتطلب البناء Android Studio أو Android SDK وJDK 21. تستخدم النسخة المحمولة خادم Mako-AI العام `https://marokecho-jrrh7cuh.manus.space` لخدمات tRPC وLLM؛ لا توجد أسرار داخل APK. يحتاج الخادم إلى السماح بأصول Capacitor الآمنة (`http://localhost` و`capacitor://localhost`) عبر CORS.
 
 ## تجهيز الواجهة
 
 ```bash
 pnpm install
-pnpm build
-npx cap sync android
+pnpm build:android
 npx cap open android
 ```
 

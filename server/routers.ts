@@ -14,6 +14,38 @@ const chatMessage = z.object({
   content: z.string().trim().min(1).max(3_000),
 });
 
+const codeAnalysisInput = z.object({
+  code: z.string().trim().min(1).max(40_000),
+  fileName: z.string().trim().min(1).max(240),
+  language: z.string().trim().min(1).max(40),
+});
+
+const codeAnalysisSchema = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "scriptguard_analysis",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        safety: { type: "integer", minimum: 0, maximum: 100 },
+        efficiency: { type: "integer", minimum: 0, maximum: 100 },
+        quality: { type: "integer", minimum: 0, maximum: 100 },
+        issues: { type: "array", maxItems: 6, items: { type: "object", properties: { type: { type: "string", enum: ["info", "warning"] }, severity: { type: "string", enum: ["critical", "high", "medium", "low"] }, title: { type: "string" }, description: { type: "string" }, line: { type: "integer", minimum: 1 }, code: { type: "string" } }, required: ["type", "severity", "title", "description", "line", "code"], additionalProperties: false } },
+        fixCode: { type: "string" },
+      },
+      required: ["safety", "efficiency", "quality", "issues", "fixCode"],
+      additionalProperties: false,
+    },
+  },
+};
+
+function analysisStatus(safety: number) {
+  if (safety < 40) return { statusTitle: "ثغرات تحتاج معالجة", statusDesc: "تم اكتشاف مخاطر مهمة؛ راجع التوصيات قبل تشغيل الكود.", statusBadge: "مخاطر مرتفعة", statusIcon: "⚠️", statusIconBg: "bg-red-500/20", statusBadgeClass: "bg-red-500/20 text-red-400 border border-red-500/30" };
+  if (safety < 70) return { statusTitle: "توجد نقاط تحتاج مراجعة", statusDesc: "التحليل وجد ملاحظات أمنية أو تشغيلية قابلة للتحسين.", statusBadge: "يحتاج مراجعة", statusIcon: "🔎", statusIconBg: "bg-yellow-500/20", statusBadgeClass: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" };
+  return { statusTitle: "النتيجة الأولية جيدة", statusDesc: "لم يظهر خطر كبير في التحليل الأولي، لكن راجع الكود قبل الإنتاج.", statusBadge: "مراجعة مكتملة", statusIcon: "🛡️", statusIconBg: "bg-green-500/20", statusBadgeClass: "bg-green-500/20 text-green-400 border border-green-500/30" };
+}
+
 function containsArabic(text: string) {
   return /[\u0600-\u06FF]/.test(text);
 }
@@ -95,6 +127,26 @@ export const appRouter = router({
           if (error instanceof TRPCError) throw error;
           console.error("[Marokecho Voice] transcription failed", error);
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Voice transcription is temporarily unavailable. Please try again." });
+        }
+      }),
+    codeAnalyze: publicProcedure
+      .input(codeAnalysisInput)
+      .mutation(async ({ input }) => {
+        try {
+          const response = await invokeLLM({
+            model: "gpt-5-mini",
+            maxTokens: 1_200,
+            response_format: codeAnalysisSchema,
+            messages: [{ role: "system", content: "You are ScriptGuard, a careful code-review assistant. Review the supplied source for security, reliability, and performance concerns. This is an advisory review, not a guarantee of safety. Return only the requested JSON schema. Write titles and descriptions in Arabic. Keep suggested code concise and preserve the user's language where practical." }, { role: "user", content: `File: ${input.fileName}\nLanguage: ${input.language}\n\n${input.code}` }],
+          });
+          const content = response.choices[0]?.message.content;
+          const parsed = typeof content === "string" ? JSON.parse(content) : null;
+          if (!parsed || typeof parsed !== "object") throw new Error("The analysis model returned invalid JSON.");
+          const safety = Math.max(0, Math.min(100, Number(parsed.safety) || 0));
+          return { ...parsed, safety, ...analysisStatus(safety), language: input.language, model: response.model };
+        } catch (error) {
+          console.error("[ScriptGuard AI] analysis failed", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تحليل الكود الآن. حاول مرة أخرى بعد لحظات." });
         }
       }),
   }),
