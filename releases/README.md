@@ -6,3 +6,5 @@
 - `Mako-AI-release.aab`: حزمة Android App Bundle للتحقق والنشر.
 
 قبل نشر AAB على Google Play، استخدم keystore إنتاجيًا خارج GitHub واضبط عنوان خادم tRPC وOAuth العام. لا تضع أسرار OAuth أو قاعدة البيانات أو LLM داخل التطبيق.
+
+Developer: **Abdelati Zarzori** — `abdelatizarzori3@gmail.com`

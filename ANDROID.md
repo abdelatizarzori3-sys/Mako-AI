@@ -36,3 +36,7 @@ cd android
 ينتج ملف النشر عادةً في `android/app/build/outputs/bundle/release/app-release.aab`.
 
 يجب اختبار تسجيل الدخول OAuth والاتصال بخادم tRPC على جهاز Android قبل رفع AAB إلى Google Play.
+
+## Developer
+
+**Abdelati Zarzori** — `abdelatizarzori3@gmail.com`

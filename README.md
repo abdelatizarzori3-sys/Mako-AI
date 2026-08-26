@@ -178,3 +178,7 @@ Create a feature branch, keep changes focused, add or update tests for behavior 
 ## License
 
 The repository currently declares the MIT license in its project metadata. Add a root `LICENSE` file before distributing the code publicly.
+
+## Developer contact
+
+**Abdelati Zarzori** — product owner and lead developer. Contact: `abdelatizarzori3@gmail.com`.
