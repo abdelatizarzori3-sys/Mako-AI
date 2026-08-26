@@ -265,6 +265,7 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-40
 .footer-links { display: flex; gap: 16px; }
 .footer-links button { padding: 0; color: var(--ink-faint); background: transparent; font-size: 10px; cursor: pointer; }
 .footer-links button:hover { color: var(--paper-200); }
+.developer-credit { color: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.03em; }
 .empty-panel { display: flex; align-items: center; flex-direction: column; padding: 74px 12px 20px; color: var(--ink-muted); text-align: center; }
 .empty-panel > svg { margin-bottom: 18px; color: var(--coral-400); }
 .empty-panel strong { color: var(--paper-100); font-family: var(--font-display); font-size: 17px; font-weight: 600; }

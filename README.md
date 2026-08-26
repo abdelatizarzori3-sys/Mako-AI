@@ -2,6 +2,8 @@
 
 > An English-first AI thinking workspace powered by Marokecho.
 
+**Developer:** Abdelati Zarzori
+
 Mako-AI provides a focused web interface for turning raw questions, plans, and notes into clear next actions. The application combines a React client, an Express/tRPC server, and a server-side AI chat procedure. API credentials remain on the server and are never exposed to the browser.
 
 ## Repository state
