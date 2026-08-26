@@ -36,6 +36,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
+        env:
+          VITE_API_BASE_URL: https://marokecho-jrrh7cuh.manus.space
         run: pnpm exec vite build
 
       - name: Configure Pages

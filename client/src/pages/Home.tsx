@@ -70,7 +70,8 @@ export default function Home() {
   const [language, setLanguage] = useState<"en" | "ar">(() => typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("ar") ? "ar" : "en");
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [composer, setComposer] = useState("");
-  const isStaticPreview = typeof window !== "undefined" && window.location.hostname.endsWith("github.io");
+  const hasConfiguredApi = Boolean(import.meta.env.VITE_API_BASE_URL);
+  const isStaticPreview = typeof window !== "undefined" && window.location.hostname.endsWith("github.io") && !hasConfiguredApi;
   const uiText = language === "ar" ? {
     engineReady: "المحرك جاهز",
     exploration: "استكشاف / 01",
@@ -134,6 +135,7 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const chat = trpc.ai.chat.useMutation();
   const voice = trpc.voice.transcribe.useMutation();
+  const apiLabel = hasConfiguredApi ? (language === "ar" ? "خادم Manus متصل" : "Manus server connected") : uiText.secureServer;
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -332,7 +334,7 @@ export default function Home() {
           <form className="composer-form" onSubmit={sendMessage}>
             <div className="composer-topline"><span><Radio size={14} /> {uiText.secureSpace}</span><span className="composer-count">{composer.length}/3000</span></div>
             <div className="composer-line"><Textarea ref={composerRef} value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder={isRecording ? uiText.listeningPlaceholder : uiText.placeholder} maxLength={3000} aria-label="Your message to Marokecho" /><button className={`voice-button ${isRecording ? "is-recording" : ""}`} type="button" onClick={() => void toggleVoiceCapture()} disabled={voice.isPending} aria-label={isRecording ? uiText.stopVoice : uiText.startVoice}>{voice.isPending ? <Loader2 size={17} className="spin-icon" /> : isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}</button><Button className="send-button" type="submit" disabled={!composer.trim() || chat.isPending || isRecording} aria-label={uiText.send}><ArrowUp size={19} /></Button></div>
-            <div className="composer-footer"><span>{uiText.enterToSend}</span><span>{uiText.newLine}</span><span className="composer-model"><span className={`status-dot ${isRecording ? "recording-dot" : ""}`} /> {isStaticPreview ? (language === "ar" ? "نسخة واجهة فقط" : "Frontend preview only") : voice.isPending ? uiText.transcribing : chat.isPending ? uiText.thinking : isRecording ? uiText.listening : uiText.secureServer}</span></div>
+            <div className="composer-footer"><span>{uiText.enterToSend}</span><span>{uiText.newLine}</span><span className="composer-model"><span className={`status-dot ${isRecording ? "recording-dot" : ""}`} /> {isStaticPreview ? (language === "ar" ? "نسخة واجهة فقط" : "Frontend preview only") : voice.isPending ? uiText.transcribing : chat.isPending ? uiText.thinking : isRecording ? uiText.listening : apiLabel}</span></div>
           </form>
           <div className="composer-shortcuts"><button type="button" onClick={newThread}><SquarePen size={15} /> {uiText.newThread}</button><button type="button" onClick={() => setNotice(language === "ar" ? "إضافة الملفات ستتوفر في تحديث مساحة العمل القادم." : "File context will be available in the next workspace update.")}><Plus size={15} /> {uiText.addContext}</button></div>
         </div>
