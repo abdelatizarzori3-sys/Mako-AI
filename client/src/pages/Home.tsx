@@ -35,7 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Streamdown } from "streamdown";
 import { trpc } from "@/lib/trpc";
 
-const STATIC_ASSET_ORIGIN = typeof window !== "undefined" && window.location.hostname.endsWith("github.io") ? "https://marokecho-jrrh7cuh.manus.space" : "";
+const PUBLIC_API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || "https://marokecho-jrrh7cuh.manus.space").replace(/\/$/, "");
+const STATIC_ASSET_ORIGIN = typeof window !== "undefined" && (window.location.protocol === "capacitor:" || window.location.hostname.endsWith("github.io")) ? PUBLIC_API_ORIGIN : "";
 const MARK_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-mark_ac6cc349.png`;
 const HERO_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-atlas-hero_162916b8.png`;
 const CARD_URL = `${STATIC_ASSET_ORIGIN}/manus-storage/marokecho-signal-card_2cf9ee52.png`;
@@ -61,6 +62,18 @@ const initialMessages: Message[] = [{
 }];
 
 type PanelMode = "overview" | "history" | "saved" | "settings";
+
+type NativeAudioRecorder = {
+  checkPermissions?: () => Promise<{ microphone?: string }>;
+  requestPermissions?: (options?: { permissions?: string[] }) => Promise<{ microphone?: string }>;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<{ audioBase64: string; mimeType: "audio/mp4"; size: number }>;
+};
+
+function nativeAudioRecorder(): NativeAudioRecorder | null {
+  const capacitor = (window as typeof window & { Capacitor?: { Plugins?: { NativeAudioRecorder?: NativeAudioRecorder } } }).Capacitor;
+  return capacitor?.Plugins?.NativeAudioRecorder || null;
+}
 
 function timeLabel() {
   return new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -162,7 +175,55 @@ export default function Home() {
     window.setTimeout(() => composerRef.current?.focus(), 0);
   };
 
+  const transcribeAudio = async (audioBase64: string, mimeType: "audio/webm" | "audio/ogg" | "audio/mp4" | "audio/wav" | "audio/mpeg") => {
+    try {
+      const result = await voice.mutateAsync({ audioBase64, mimeType, language });
+      setComposer((current) => current ? `${current.trim()} ${result.text}` : result.text);
+      window.setTimeout(() => composerRef.current?.focus(), 0);
+    } catch (error) {
+      console.error(error);
+      setNotice(language === "ar" ? "تعذر تحويل الصوت إلى نص مؤقتًا. حاول مرة أخرى." : "Voice transcription is temporarily unavailable. Please try again.");
+    }
+  };
+
+  const toggleNativeVoiceCapture = async (recorder: NativeAudioRecorder) => {
+    if (isRecording) {
+      try {
+        const audio = await recorder.stopRecording();
+        setIsRecording(false);
+        await transcribeAudio(audio.audioBase64, audio.mimeType);
+      } catch (error) {
+        console.error(error);
+        setIsRecording(false);
+        setNotice(language === "ar" ? "تعذر حفظ المقطع. قل جملة أطول ثم أعد المحاولة." : "The clip could not be saved. Speak a little longer and try again.");
+      }
+      return;
+    }
+    try {
+      const permission = await recorder.checkPermissions?.();
+      const state = permission?.microphone;
+      if (state !== "granted") {
+        const requested = await recorder.requestPermissions?.({ permissions: ["microphone"] });
+        if (requested?.microphone !== "granted") {
+          setNotice(language === "ar" ? "فعّل إذن الميكروفون لتطبيق Mako-AI من إعدادات Android ثم حاول مرة أخرى." : "Enable the Mako-AI microphone permission in Android Settings, then try again.");
+          return;
+        }
+      }
+      await recorder.startRecording();
+      setIsRecording(true);
+      setNotice(language === "ar" ? "أستمع الآن… اضغط الميكروفون مرة أخرى عند الانتهاء." : "Listening… press the microphone again when you are done.");
+    } catch (error) {
+      console.error(error);
+      setNotice(language === "ar" ? "تعذر بدء التسجيل الصوتي. تحقق من إذن الميكروفون ثم حاول مرة أخرى." : "Voice recording could not start. Check the microphone permission and try again.");
+    }
+  };
+
   const toggleVoiceCapture = async () => {
+    const nativeRecorder = nativeAudioRecorder();
+    if (nativeRecorder) {
+      await toggleNativeVoiceCapture(nativeRecorder);
+      return;
+    }
     if (isRecording) {
       recorderRef.current?.stop();
       return;
@@ -198,18 +259,7 @@ export default function Home() {
         reader.onload = async () => {
           const dataUrl = String(reader.result || "");
           const audioBase64 = dataUrl.split(",")[1] || "";
-          try {
-            const result = await voice.mutateAsync({
-              audioBase64,
-              mimeType: recorder.mimeType.startsWith("audio/ogg") ? "audio/ogg" : recorder.mimeType.startsWith("audio/mp4") ? "audio/mp4" : "audio/webm",
-              language,
-            });
-            setComposer((current) => current ? `${current.trim()} ${result.text}` : result.text);
-            window.setTimeout(() => composerRef.current?.focus(), 0);
-          } catch (error) {
-            console.error(error);
-            setNotice(language === "ar" ? "تعذر تحويل الصوت إلى نص مؤقتًا. حاول مرة أخرى." : "Voice transcription is temporarily unavailable. Please try again.");
-          }
+          await transcribeAudio(audioBase64, recorder.mimeType.startsWith("audio/ogg") ? "audio/ogg" : recorder.mimeType.startsWith("audio/mp4") ? "audio/mp4" : "audio/webm");
         };
         reader.readAsDataURL(blob);
       };
