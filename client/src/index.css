@@ -58,9 +58,9 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--ink-950); }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--ink-950); }
-button, textarea { font: inherit; }
+button, input, textarea { font: inherit; }
 button { border: 0; }
-button:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-400); outline-offset: 3px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-400); outline-offset: 3px; }
 
 .marokecho-shell {
   position: relative;
@@ -260,6 +260,16 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--coral-40
 .session-stats strong, .session-stats span { display: block; }
 .session-stats strong { color: var(--paper-50); font-family: var(--font-display); font-size: 22px; font-weight: 500; }
 .session-stats span { margin-top: 3px; color: var(--ink-faint); font-size: 10px; }
+.export-panel { display: flex; flex-direction: column; gap: 10px; }
+.export-panel .section-heading { margin-bottom: 1px; }
+.export-title-field { display: flex; flex-direction: column; gap: 6px; color: var(--ink-muted); font-family: var(--font-mono); font-size: 9px; }
+.export-title-field input { width: 100%; padding: 9px 10px; border: 1px solid var(--line-dark); border-radius: 2px; color: var(--paper-100); background: rgba(242, 235, 221, 0.055); font-family: var(--font-body); font-size: 11px; }
+.export-title-field input:focus { border-color: rgba(216, 106, 74, 0.7); outline: 0; }
+.export-panel p, .export-panel small { margin: 0; color: var(--ink-faint); font-size: 10px; line-height: 1.7; }
+.export-panel small { color: var(--olive-300); }
+.export-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 8px 10px; border: 1px solid rgba(216, 106, 74, 0.45); border-radius: 2px; color: var(--paper-50); background: rgba(216, 106, 74, 0.14); font-size: 11px; cursor: pointer; transition: background 180ms var(--ease-out), transform 180ms var(--ease-out); }
+.export-button:hover { background: rgba(216, 106, 74, 0.24); transform: translateY(-1px); }
+.export-button:disabled { cursor: wait; opacity: 0.62; transform: none; }
 .panel-note { display: flex; align-items: flex-start; gap: 11px; margin-top: 25px; padding: 13px 12px; border-right: 2px solid var(--coral-500); background: rgba(242, 235, 221, 0.09); background-image: url("/manus-storage/marokecho-paper-texture_faf053d9.png"); background-size: 360px; }
 .note-pin { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--coral-500); box-shadow: 0 0 0 5px rgba(216, 106, 74, 0.1); }
 .panel-note p { margin: 0; color: var(--paper-300); font-size: 11px; line-height: 1.8; }
