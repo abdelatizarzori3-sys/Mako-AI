@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -22,7 +22,27 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+/**
+ * Payment-provider webhooks will own writes to this table once a provider and
+ * country/channel are selected. The application only reads it to authorize Pro.
+ */
+export const subscriptionEntitlements = mysqlTable("subscription_entitlements", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  providerCustomerId: varchar("providerCustomerId", { length: 255 }).notNull(),
+  providerSubscriptionId: varchar("providerSubscriptionId", { length: 255 }).notNull().unique(),
+  plan: mysqlEnum("plan", ["pro"]).notNull(),
+  status: mysqlEnum("status", ["active", "canceled", "expired", "past_due"]).notNull(),
+  currentPeriodEndsAt: timestamp("currentPeriodEndsAt").notNull(),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type SubscriptionEntitlement = typeof subscriptionEntitlements.$inferSelect;
+export type InsertSubscriptionEntitlement = typeof subscriptionEntitlements.$inferInsert;
 
 // TODO: Add your tables here

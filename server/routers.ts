@@ -2,12 +2,14 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { COOKIE_NAME } from "@shared/const";
+import { buildConversationMarkdown, createConversationExportFilename } from "@shared/conversationExport";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { getExportEntitlement, requireExportEntitlement } from "./entitlements";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { systemRouter } from "./_core/systemRouter";
 import { storageGetSignedUrl, storagePut } from "./storage";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 
 const chatMessage = z.object({
   role: z.enum(["user", "assistant"]),
@@ -19,6 +21,18 @@ const codeAnalysisInput = z.object({
   fileName: z.string().trim().min(1).max(240),
   language: z.string().trim().min(1).max(40),
 });
+
+const conversationExportInput = z.object({
+  title: z.string().trim().min(1).max(120),
+  messages: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().min(1).max(12_000),
+    createdAt: z.string().datetime({ offset: true }),
+  })).min(1).max(60),
+}).refine(
+  ({ messages }) => messages.reduce((total, message) => total + message.content.length, 0) <= 120_000,
+  { message: "Conversation exports are limited to 120,000 characters." },
+);
 
 const codeAnalysisSchema = {
   type: "json_schema" as const,
@@ -58,6 +72,12 @@ export const appRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
+    }),
+  }),
+  billing: router({
+    exportStatus: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return { canExport: false, status: "sign_in_required" as const };
+      return getExportEntitlement(ctx.user);
     }),
   }),
   ai: router({
@@ -101,6 +121,19 @@ export const appRouter = router({
               : "Marokecho could not generate a reply right now. Please try again.",
           });
         }
+      }),
+  }),
+  conversation: router({
+    exportCurrent: protectedProcedure
+      .input(conversationExportInput)
+      .mutation(async ({ ctx, input }) => {
+        await requireExportEntitlement(ctx.user);
+        const exportedAt = new Date().toISOString();
+
+        return {
+          markdown: buildConversationMarkdown(input, exportedAt),
+          fileName: createConversationExportFilename(exportedAt),
+        };
       }),
   }),
   voice: router({

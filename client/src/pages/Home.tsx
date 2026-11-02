@@ -13,6 +13,7 @@ import {
   Command,
   Compass,
   Copy,
+  Download,
   ExternalLink,
   FolderOpen,
   Globe2,
@@ -51,6 +52,7 @@ type Message = {
   id: string;
   role: "assistant" | "user";
   time: string;
+  createdAt: string;
   text: string;
 };
 
@@ -58,6 +60,7 @@ const initialMessages: Message[] = [{
   id: "welcome",
   role: "assistant",
   time: "Now",
+  createdAt: new Date().toISOString(),
   text: "I am Marokecho. Bring the raw thought—a question, a plan, a half-formed note—and we will turn it into a clearer next move.",
 }];
 
@@ -110,6 +113,16 @@ export default function Home() {
     addContext: "إضافة سياق",
     copy: "نسخ الرد",
     copied: "تم النسخ",
+    exportCurrent: "تصدير المحادثة الحالية",
+    exportTitle: "عنوان ملف التصدير",
+    exportDescription: "يُنزّل رسائل هذه الجلسة الحالية بصيغة Markdown، دون إنشاء رد جديد أو أرشفتها.",
+    exportReady: "اشتراك Pro موثق",
+    exportSetupRequired: "يتطلب التصدير اشتراك Pro موثقًا. إعداد الشراء غير متاح بعد.",
+    exportSignInRequired: "سجّل الدخول بحساب يملك اشتراك Pro موثقًا للتصدير.",
+    exportChecking: "جارٍ التحقق من اشتراك Pro…",
+    staticExport: "يتطلب التصدير الخادم الكامل واشتراك Pro موثقًا.",
+    exportComplete: "تم تنزيل المحادثة الحالية بصيغة Markdown.",
+    exportUnavailable: "تعذر التحقق من الاشتراك؛ لم يُنزّل أي ملف.",
   } : {
     engineReady: "AI engine ready",
     exploration: "EXPLORATION / 01",
@@ -135,12 +148,23 @@ export default function Home() {
     addContext: "Add context",
     copy: "Copy reply",
     copied: "Copied",
+    exportCurrent: "Export current chat",
+    exportTitle: "Export title",
+    exportDescription: "Downloads this current session's messages as Markdown. It does not generate a new reply or archive the chat.",
+    exportReady: "Verified Pro subscription",
+    exportSetupRequired: "Export needs a verified Pro subscription. Purchase setup is not available yet.",
+    exportSignInRequired: "Sign in with an account that has a verified Pro subscription to export.",
+    exportChecking: "Checking Pro subscription…",
+    staticExport: "Export needs the full server and a verified Pro subscription.",
+    exportComplete: "Current chat downloaded as Markdown.",
+    exportUnavailable: "The subscription could not be verified. No file was downloaded.",
   };
 
   const [activeMode, setActiveMode] = useState<PanelMode>("overview");
   const [panelOpen, setPanelOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [conversationTitle, setConversationTitle] = useState(language === "ar" ? "محادثة ماروكيتشو" : "Marokecho conversation");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const streamEndRef = useRef<HTMLDivElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -148,6 +172,8 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const chat = trpc.ai.chat.useMutation();
   const voice = trpc.voice.transcribe.useMutation();
+  const exportStatus = trpc.billing.exportStatus.useQuery(undefined, { retry: false });
+  const exportCurrent = trpc.conversation.exportCurrent.useMutation();
   const apiLabel = hasConfiguredApi ? (language === "ar" ? "خادم Manus متصل" : "Manus server connected") : uiText.secureServer;
 
   useEffect(() => {
@@ -282,7 +308,7 @@ export default function Home() {
       return;
     }
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: "user", time: timeLabel(), text: content };
+    const userMessage: Message = { id: `user-${Date.now()}`, role: "user", time: timeLabel(), createdAt: new Date().toISOString(), text: content };
     const history = messages
       .filter((message) => message.id !== "welcome")
       .slice(-10)
@@ -295,7 +321,7 @@ export default function Home() {
       const response = await chat.mutateAsync({ message: content, history });
       setMessages((current) => [
         ...current,
-        { id: `assistant-${Date.now()}`, role: "assistant", time: timeLabel(), text: response.reply },
+        { id: `assistant-${Date.now()}`, role: "assistant", time: timeLabel(), createdAt: new Date().toISOString(), text: response.reply },
       ]);
     } catch (error) {
       console.error(error);
@@ -304,8 +330,9 @@ export default function Home() {
   };
 
   const newThread = () => {
-    setMessages(initialMessages);
+    setMessages([{ ...initialMessages[0], createdAt: new Date().toISOString(), text: uiText.welcome }]);
     setComposer("");
+    setConversationTitle(language === "ar" ? "محادثة ماروكيتشو" : "Marokecho conversation");
     setActiveMode("overview");
     setNotice("New thread started.");
     composerRef.current?.focus();
@@ -315,6 +342,45 @@ export default function Home() {
     await navigator.clipboard?.writeText(message.text);
     setCopiedId(message.id);
     window.setTimeout(() => setCopiedId(null), 1600);
+  };
+
+  const exportCurrentConversation = async () => {
+    if (isStaticPreview) {
+      setNotice(uiText.staticExport);
+      return;
+    }
+    if (exportStatus.isLoading) {
+      setNotice(uiText.exportChecking);
+      return;
+    }
+    if (exportStatus.isError) {
+      setNotice(uiText.exportUnavailable);
+      return;
+    }
+    if (!exportStatus.data?.canExport) {
+      setNotice(exportStatus.data?.status === "sign_in_required" ? uiText.exportSignInRequired : uiText.exportSetupRequired);
+      return;
+    }
+
+    try {
+      const result = await exportCurrent.mutateAsync({
+        title: conversationTitle,
+        messages: messages.map(({ role, text, createdAt }) => ({ role, content: text, createdAt })),
+      });
+      const blob = new Blob([result.markdown], { type: "text/markdown;charset=utf-8" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = result.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setNotice(uiText.exportComplete);
+    } catch (error) {
+      console.error(error);
+      setNotice(uiText.exportUnavailable);
+    }
   };
 
   const localizedSuggestions = language === "ar" ? [
@@ -393,6 +459,7 @@ export default function Home() {
       <aside className={`context-panel ${panelOpen ? "is-open" : ""}`} aria-label="Context panel">
         <div className="panel-header"><div><span className="eyebrow">{language === "ar" ? "لوحة السياق" : "Context panel"}</span><h2>{activeMode === "overview" ? (language === "ar" ? "إشارة الجلسة" : "Session signal") : activeMode === "history" ? (language === "ar" ? "الأرشيف" : "Archive") : activeMode === "saved" ? (language === "ar" ? "المحفوظات" : "Saved work") : (language === "ar" ? "إعدادات مساحة العمل" : "Workspace settings")}</h2></div><button className="icon-button mobile-only" onClick={() => setPanelOpen(false)} aria-label="Close context panel"><X size={18} /></button></div>
         {activeMode === "overview" && <><div className="signal-card" style={{ backgroundImage: `linear-gradient(145deg, rgba(24,27,31,.08), rgba(24,27,31,.76)), url(${CARD_URL})` }}><div className="signal-card-top"><span>01 / 03</span><Compass size={18} /></div><div><strong>{language === "ar" ? "الطريق واضح" : "The route is clear"}</strong><p>{language === "ar" ? "كل رد يبدأ من سياقك، لا من قالب عام." : "Every reply starts with your context, not a generic template."}</p></div><div className="signal-meter"><span /><span /><span /></div></div><div className="panel-section"><div className="section-heading"><span>{language === "ar" ? "حالة المحرك" : "Engine status"}</span><span className="ready-tag"><i /> {language === "ar" ? "متصل" : "Live"}</span></div><div className="engine-status"><div className="engine-icon"><Zap size={17} /></div><div><strong>Marokecho AI</strong><small>{isStaticPreview ? (language === "ar" ? "واجهة فقط · بلا خادم" : "FRONTEND ONLY · NO SERVER") : language === "ar" ? "خادم آمن" : "GPT-5 MINI · SERVER"}</small></div><MoreHorizontal size={18} className="muted-icon" /></div></div><div className="panel-section"><div className="section-heading"><span>{language === "ar" ? "نبض الجلسة" : "Session pulse"}</span><Clock3 size={15} /></div><div className="session-stats"><div><strong>{messages.filter((message) => message.role === "user").length}</strong><span>{language === "ar" ? "رسائلك" : "Your messages"}</span></div><div><strong>{lastUserMessage ? "Live" : "—"}</strong><span>{language === "ar" ? "آخر إشارة" : "Last signal"}</span></div></div></div><div className="panel-note"><span className="note-pin" /><p>{language === "ar" ? "اكتب دون تنميق؛ فالردود القوية تبدأ من السؤال الحقيقي." : "Write without polishing. Strong answers start with the real question."}</p></div></>}
+        {activeMode === "overview" && <section className="panel-section export-panel"><div className="section-heading"><span>{language === "ar" ? "تصدير Pro" : "Pro export"}</span><Download size={15} /></div><label className="export-title-field"><span>{uiText.exportTitle}</span><input value={conversationTitle} onChange={(event) => setConversationTitle(event.target.value)} maxLength={120} aria-label={uiText.exportTitle} /></label><p>{uiText.exportDescription}</p><button type="button" className="export-button" onClick={() => void exportCurrentConversation()} disabled={exportCurrent.isPending}>{exportCurrent.isPending ? <Loader2 size={15} className="spin-icon" /> : <Download size={15} />}{exportCurrent.isPending ? uiText.exportChecking : uiText.exportCurrent}</button><small>{exportStatus.data?.canExport ? uiText.exportReady : exportStatus.isLoading ? uiText.exportChecking : exportStatus.data?.status === "sign_in_required" ? uiText.exportSignInRequired : uiText.exportSetupRequired}</small></section>}
         {activeMode === "history" && <div className="empty-panel"><History size={30} /><strong>No archive yet</strong><p>Past working sessions will appear here when persistence is enabled.</p><button onClick={() => setActiveMode("overview")}>Return to session <ChevronLeft size={15} /></button></div>}
         {activeMode === "saved" && <div className="empty-panel"><FolderOpen size={30} /><strong>Saved work is quiet</strong><p>Pin important replies to build a reusable working library.</p><button onClick={() => setNotice("Saved replies will be available with workspace accounts.")}>Learn more <ExternalLink size={14} /></button></div>}
         {activeMode === "settings" && <div className="settings-panel"><div className="setting-row"><div><strong>{language === "ar" ? "اللغة الأساسية" : "Primary language"}</strong><small>{language === "ar" ? "العربية" : "English"}</small></div><Globe2 size={17} /></div><div className="setting-row"><div><strong>{language === "ar" ? "النمط" : "Mode"}</strong><small>{language === "ar" ? "ليل الحبر" : "Ink night"}</small></div><span className="mode-chip">Live</span></div><div className="setting-row"><div><strong>{language === "ar" ? "الاختصارات" : "Shortcuts"}</strong><small>{language === "ar" ? "مفعلة" : "Enabled"}</small></div><Command size={17} /></div></div>}
